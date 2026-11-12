@@ -1,20 +1,52 @@
+import json
+
+from pathlib import Path
+
+from datetime import datetime, timedelta, timezone
+
+import time
+
 import requests
 
 URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 
-params = {
-    "pubStartDate": "2026-11-01T00:00:00.000",
-    "pubEndDate": "2026-11-08T00:00:00.000",
-    "resultsPerPage": 5,
-}
+DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.000"
 
-response = requests.get(URL, params=params, timeout=30)
-response.raise_for_status()
-data = response.json()
+end = datetime.now(timezone.utc)
+start = end - timedelta(days=7)
 
-print("Total CVEs in this total range:", data["totalResults"])
+PAGE_SIZE = 2000
 
-for item in data["vulnerabilities"]:
-    cve = item["cve"]
-    description = cve["descriptions"][0]["value"]
-    print(cve["id"], "|", cve["published"], "|", description)
+all_cves = []
+start_index = 0
+
+while True:
+    params = {
+        "pubStartDate": start.strftime(DATE_FORMAT),
+        "pubEndDate": end.strftime(DATE_FORMAT),
+        "resultsPerPage": PAGE_SIZE,
+        "startIndex": start_index,
+    }
+
+    response = requests.get(URL, params=params, timeout=60)
+    response.raise_for_status()
+    data = response.json()
+
+    all_cves.extend(data["vulnerabilities"])
+    print("Fetched", len(all_cves), "of", data["totalResults"])
+
+    start_index += PAGE_SIZE
+
+    if start_index >= data["totalResults"]:
+        break
+
+    time.sleep(6)
+
+output_dir = Path("data/raw")
+output_dir.mkdir(parents=True, exist_ok=True)
+output_file = output_dir / f"cves_{end.strftime('%Y-%m-%d')}.json"
+
+with open(output_file, "w") as f:
+    json.dump(all_cves, f)
+
+    print("Saved", len(all_cves), "CVEs to", output_file)
