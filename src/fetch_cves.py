@@ -49,4 +49,4 @@ output_file = output_dir / f"cves_{end.strftime('%Y-%m-%d')}.json"
 with open(output_file, "w") as f:
     json.dump(all_cves, f)
 
-    print("Saved", len(all_cves), "CVEs to", output_file)
+print("Saved", len(all_cves), "CVEs to", output_file)
